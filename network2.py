@@ -119,6 +119,7 @@ class Network(object):
     def SGD(self, training_data, epochs, mini_batch_size, eta,
             lmbda = 0.0,
             evaluation_data=None,
+            L1_regularization=False,
             monitor_evaluation_cost=False,
             monitor_evaluation_accuracy=False,
             monitor_training_cost=False,
@@ -140,6 +141,8 @@ class Network(object):
         will be a 30-element list containing the cost on the
         evaluation data at the end of each epoch. Note that the lists
         are empty if the corresponding flag is not set.
+
+        XF: add L1_regularization as an exercise: True to use L1, False for L2 regularization
         """
         if evaluation_data:
             evaluation_data = list(evaluation_data)
@@ -154,11 +157,11 @@ class Network(object):
             random.shuffle(training_data)
             mini_batches = [training_data[k:k+mini_batch_size] for k in range(0, n, mini_batch_size)]
             for mini_batch in mini_batches:
-                self.update_mini_batch(mini_batch, eta, lmbda, len(training_data))
+                self.update_mini_batch(mini_batch, eta, lmbda, len(training_data), L1_regularization=L1_regularization)
 
             print ("Epoch %s training complete" % j)
             if monitor_training_cost:
-                cost = self.total_cost(training_data, lmbda)
+                cost = self.total_cost(training_data, lmbda, L1_regularization=L1_regularization)
                 training_cost.append(cost)
                 print ("Cost on training data: {}".format(cost))
             if monitor_training_accuracy:
@@ -166,7 +169,7 @@ class Network(object):
                 training_accuracy.append(accuracy)
                 print ("Accuracy on training data: {} / {}".format(accuracy, n))
             if monitor_evaluation_cost:
-                cost = self.total_cost(evaluation_data, lmbda, convert=True)
+                cost = self.total_cost(evaluation_data, lmbda, convert=True, L1_regularization=L1_regularization)
                 evaluation_cost.append(cost)
                 print ("Cost on evaluation data: {}".format(cost))
             if monitor_evaluation_accuracy:
@@ -175,10 +178,9 @@ class Network(object):
                 print ("Accuracy on evaluation data: {} / {}".format(
                     self.accuracy(evaluation_data), n_data))
             print("")
-        return evaluation_cost, evaluation_accuracy, \
-            training_cost, training_accuracy
+        return evaluation_cost, evaluation_accuracy, training_cost, training_accuracy
 
-    def update_mini_batch(self, mini_batch, eta, lmbda, n):
+    def update_mini_batch(self, mini_batch, eta, lmbda, n, L1_regularization = False):
         """Update the network's weights and biases by applying gradient
         descent using backpropagation to a single mini batch.  The
         ``mini_batch`` is a list of tuples ``(x, y)``, ``eta`` is the
@@ -192,8 +194,12 @@ class Network(object):
             nabla_b = [nb+dnb for nb, dnb in zip(nabla_b, delta_nabla_b)]
             nabla_w = [nw+dnw for nw, dnw in zip(nabla_w, delta_nabla_w)]
 
-        self.weights = [(1-eta*(lmbda/n))*w-(eta/len(mini_batch))*nw
-                        for w, nw in zip(self.weights, nabla_w)]
+        if L1_regularization:
+            self.weights = [w - eta * (lmbda / n) * np.sign(w) - (eta / len(mini_batch)) * nw
+                            for w, nw in zip(self.weights, nabla_w)]
+        else:
+            self.weights = [(1-eta*(lmbda/n))*w-(eta/len(mini_batch))*nw
+                            for w, nw in zip(self.weights, nabla_w)]
         self.biases = [b-(eta/len(mini_batch))*nb
                        for b, nb in zip(self.biases, nabla_b)]
 
@@ -260,7 +266,7 @@ class Network(object):
                         for (x, y) in data]
         return sum(int(x == y) for (x, y) in results)
 
-    def total_cost(self, data, lmbda, convert=False):
+    def total_cost(self, data, lmbda, convert=False, L1_regularization=False):
         """Return the total cost for the data set ``data``.  The flag
         ``convert`` should be set to False if the data set is the
         training data (the usual case), and to True if the data set is
@@ -273,7 +279,11 @@ class Network(object):
             if convert: y = vectorized_result(y)
             cost += self.cost.fn(a, y)/len(data)
 
-        cost += 0.5*(lmbda/len(data))*sum(np.linalg.norm(w)**2 for w in self.weights)
+        if L1_regularization:
+            cost += 0.5*(lmbda / len(data)) * sum(np.absolute(np.linalg.norm(w)) for w in self.weights)
+        else:
+            cost += 0.5*(lmbda/len(data))*sum(np.linalg.norm(w)**2 for w in self.weights)
+
         return cost
 
     def save(self, filename):
