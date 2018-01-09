@@ -1,5 +1,5 @@
 # vanilla_neural_network
-Vanilla neural network to understand the underlying mechanisms. 
+Vanilla neural network to understand the underlying mechanisms of a multilayer perceptron. 
 
 The neural network on this project is made to recognize hand written digits.
 
