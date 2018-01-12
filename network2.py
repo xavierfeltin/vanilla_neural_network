@@ -15,6 +15,7 @@ features.
 import json
 import random
 import sys
+from collections import deque
 
 # Third-party libraries
 import numpy as np
@@ -77,6 +78,7 @@ class Network(object):
         self.sizes = sizes
         self.default_weight_initializer()
         self.cost=cost
+        self.last_epochs_accuracy = deque()
 
     def default_weight_initializer(self):
         """Initialize each weight using a Gaussian distribution with mean 0
@@ -120,6 +122,7 @@ class Network(object):
             lmbda = 0.0,
             evaluation_data=None,
             L1_regularization=False,
+            nb_early_stopping=10,
             monitor_evaluation_cost=False,
             monitor_evaluation_accuracy=False,
             monitor_training_cost=False,
@@ -153,7 +156,10 @@ class Network(object):
 
         evaluation_cost, evaluation_accuracy = [], []
         training_cost, training_accuracy = [], []
-        for j in range(epochs):
+
+        #for j in range(epochs):
+        j = 0
+        while j < epochs and self.is_still_improving(nb_early_stopping):
             random.shuffle(training_data)
             mini_batches = [training_data[k:k+mini_batch_size] for k in range(0, n, mini_batch_size)]
             for mini_batch in mini_batches:
@@ -175,9 +181,17 @@ class Network(object):
             if monitor_evaluation_accuracy:
                 accuracy = self.accuracy(evaluation_data)
                 evaluation_accuracy.append(accuracy)
+
+                while len(self.last_epochs_accuracy) >= nb_early_stopping:
+                    self.last_epochs_accuracy.pop()
+                self.last_epochs_accuracy.append(accuracy)
+
                 print ("Accuracy on evaluation data: {} / {}".format(
                     self.accuracy(evaluation_data), n_data))
             print("")
+
+            j += 1
+
         return evaluation_cost, evaluation_accuracy, training_cost, training_accuracy
 
     def update_mini_batch(self, mini_batch, eta, lmbda, n, L1_regularization = False):
@@ -295,6 +309,22 @@ class Network(object):
         f = open(filename, "w")
         json.dump(data, f)
         f.close()
+
+    def is_still_improving(self, n):
+        """True if the neural network is still improving over the last n epochs"""
+
+        if len(self.last_epochs_accuracy) >= n:
+            current, delta = 0,0
+            previous = self.last_epochs_accuracy[n-1]
+            for i in reversed(range(n-1)):
+                current = self.last_epochs_accuracy[i]
+                delta += (current - previous)
+                previous = current
+
+            return abs(delta) > 0
+        else:
+            return True
+
 
 #### Loading a Network
 def load(filename):
