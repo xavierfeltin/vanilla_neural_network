@@ -118,9 +118,9 @@ class Network(object):
             a = sigmoid(np.dot(w, a)+b)
         return a
 
-    def SGD(self, training_data, epochs, mini_batch_size, eta,
+    def SGD(self, p_training_data, epochs, mini_batch_size, eta,
             lmbda = 0.0,
-            evaluation_data=None,
+            p_evaluation_data=None,
             L1_regularization=False,
             nb_early_stopping=10,
             monitor_evaluation_cost=False,
@@ -147,19 +147,21 @@ class Network(object):
 
         XF: add L1_regularization as an exercise: True to use L1, False for L2 regularization
         """
-        if evaluation_data:
-            evaluation_data = list(evaluation_data)
+
+        if p_evaluation_data:
+            evaluation_data = list(p_evaluation_data)[:]
             n_data = len(evaluation_data)
 
-        training_data = list(training_data)
+        training_data = list(p_training_data)[:]
         n = len(training_data)
 
         evaluation_cost, evaluation_accuracy = [], []
         training_cost, training_accuracy = [], []
 
         #for j in range(epochs):
+        thresold_learning_coeff = eta / 128
         j = 0
-        while j < epochs and self.is_still_improving(nb_early_stopping):
+        while j < epochs and eta > thresold_learning_coeff: #self.is_still_improving(nb_early_stopping):
             random.shuffle(training_data)
             mini_batches = [training_data[k:k+mini_batch_size] for k in range(0, n, mini_batch_size)]
             for mini_batch in mini_batches:
@@ -189,6 +191,12 @@ class Network(object):
                 print ("Accuracy on evaluation data: {} / {}".format(
                     self.accuracy(evaluation_data), n_data))
             print("")
+
+            #Reduce learning rate when reaching early stop
+            #Reinitialize early stop
+            if not self.is_still_improving(nb_early_stopping):
+                eta = eta /2
+                self.last_epochs_accuracy.clear()
 
             j += 1
 
